@@ -7,7 +7,7 @@ function setup() {
 	ln -s "$(hostname)" "$ROOT/LOCAL"
 }
 
-function dir-to-subvolume() {
+function dir_to_subvolume() {
 	# You can't use this on /.
 	# You don't need to, either.
 	dirname="$1"
@@ -17,13 +17,13 @@ function dir-to-subvolume() {
 	rmdir /"$d"-tmp
 }
 
-function setup-dir() {
+function setup_dir() {
 	dirname="$1"
 	encoded="$(encode "$dirname")"
 	mkdir "$ROOT"/LOCAL/$encoded"
 }
 
-function all-hosts() {
+function all_hosts() {
 	(
 		cd "$ROOT";
 		for hostroot in *; do
@@ -34,13 +34,13 @@ function all-hosts() {
 	)
 }
 
-function default-push-hosts() {
-	if [ -e "$ROOT"/default-push-hosts ]; then
-		cat "$ROOT"/default-push-hosts
+function default_push_hosts() {
+	if [ -e "$ROOT"/default_push_hosts ]; then
+		cat "$ROOT"/default_push_hosts
 	fi
 }
 
-function dirs-on-host() {
+function dirs_on_host() {
 	host="$1"
 	(
 		cd "$ROOT/$host"
@@ -50,15 +50,15 @@ function dirs-on-host() {
 	)
 }
 		
-function cleanup-all() {
-	all-hosts | while read host; do
-		dirs-on-host "$host" | while read dir; do
-			cleanup-dir "$ROOT/$host/$dir"
+function cleanup_all() {
+	all_hosts | while read host; do
+		dirs_on_host "$host" | while read dir; do
+			cleanup_dir "$ROOT/$host/$dir"
 		done
 	done
 }
 
-function cleanup-dir() {
+function cleanup_dir() {
 	btrfs-cleanup-candidates $1 | while read DIRNAME; do
 		# TODO check it's not the latest for some host.
 		# We need to keep those!
@@ -67,10 +67,10 @@ function cleanup-dir() {
 	done
 }
 
-function push-all() {
-	dirs-on-host LOCAL | while read encoded; do
+function push_all() {
+	dirs_on_host LOCAL | while read encoded; do
 		snap "$(decode "$encoded")"
-		send-dir "$encoded"
+		send_dir "$encoded"
 	done
 }
 
@@ -90,11 +90,11 @@ function snap() {
 	btrfs subvolume snapshot -r "$dirname" "$snapname"
 }
 
-function latest-snap() {
+function latest_snap() {
 	ls "$ROOT/LOCAL/$1" | grep -v '^CURRENT' | tail -n 1
 }
 
-function hosts-for-snapdir() {
+function hosts_for_snapdir() {
 	(
 		dirname="$1"
 		cd "$dirname"
@@ -104,25 +104,25 @@ function hosts-for-snapdir() {
 	)
 }
 
-function send-dir() {
+function send_dir() {
 	encoded="$1"
-	hosts-for-snapdir "$encoded" | while read host; do
-		send-dir-host "$encoded" "$host"
+	hosts_for_snapdir "$encoded" | while read host; do
+		send_dir_host "$encoded" "$host"
 	done
 }
 
-function send-dir-defaults() {
+function send_dir_defaults() {
 	encoded="$1"
-	default-push-hosts | while read host; do
-		send-dor-host "$encoding" "$host"
+	default_push_hosts | while read host; do
+		send_dir_host "$encoding" "$host"
 	done
 }
 
-function send-dir-host() {
+function send_dir_host() {
 	encoded="$1"
 	host="$2"
 	snapdir="$ROOT/LOCAL/$encoded"
-	current="$(latest-snap "$encoded")"
+	current="$(latest_snap "$encoded")"
 	last_success_file="$snapdir/CURRENT-$host"
 	if (
 		if [ -e "$last_success_file" ]; then
