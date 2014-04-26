@@ -1,0 +1,66 @@
+#!/usr/bin/python
+
+import os
+import os.path
+import datetime
+import re
+
+MIN_AGE_BOUNDARY = 10
+BOUNDARY_DECAY = 1.5
+
+NAME_RE = re.compile(r'\d{8}-\d{6}')
+
+def candidates_in_dir(dirname):
+	now = datetime.datetime.now()
+	aged_list = []
+	for name in os.listdir(dirname):
+		fullname = os.path.join(dirname, name)
+		if os.path.isdir(fullname) and NAME_RE.match(name):
+			snapts = datetime.datetime.strptime(name, '%Y%m%d-%H%M%S')
+			age = (now - snapts).total_seconds()
+			aged_list.append((age, fullname))
+		else: #elif name not in ('CURRENT',):
+			print >>sys.stderr, "Rejecting name", name
+	aged_list.sort()
+	return candidates_in_list(aged_list)
+
+def candidates_in_list(aged_list):
+	accept = []
+	reject = []
+	threshold = MIN_AGE_BOUNDARY
+	accepted = False
+	for age, snapname in aged_list:
+		while age > threshold:
+			accepted = False
+			threshold *= BOUNDARY_DECAY
+			#print "New threshold: %s" % (threshold,)
+		if accepted:
+			#print "%s: reject (age=%s)" % (snapname, age)
+			reject.append(snapname)
+		else:
+			#print "%s: accept (age=%s)" % (snapname, age)
+			accept.append(snapname)
+			accepted = True
+	assert accept[0] == aged_list[0][1]
+	assert set(accept + reject) == set(x[1] for x in aged_list), aged_list
+	return accept, reject
+
+def sample_candidates_in_list():
+	l = range(1000)
+	n = 0
+	while len(l) > 1:
+		l, r = candidates_in_list([(x+n,x) for x in l])
+		n += 1
+		if r:
+			print "Discard", r, "after", n, "iterations"
+			print "Remaining", l
+
+if __name__ == '__main__':
+	import sys
+	accept, reject = candidates_in_dir(sys.argv[1])
+ 	# We actually want to delete the oldest bad candidate first.
+	# It makes more sense to the user this way.
+	for snapname in reversed(reject):
+		print snapname
+	#for snapname in accept:
+	#	print "accept", snapname

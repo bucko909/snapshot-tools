@@ -1,0 +1,6 @@
+#!/bin/sh
+
+/root/bin/btrfs-cleanup-candidates $1 | while read DIRNAME; do
+	echo "DELETING $DIRNAME"
+	btrfs subvolume delete "$DIRNAME"
+done
