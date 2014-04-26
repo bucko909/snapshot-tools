@@ -1,0 +1,24 @@
+#!/bin/sh
+
+domain="$(grep search /etc/resolv.conf | cut -d' ' -f2)"
+ssh_remote="$(echo "$SSH_CLIENT" | cut -d' ' -f1)"
+in_addr="$(echo "$ssh_remote" | tr '.' '\n' | tac | tr '\n' '.' | sed 's/\.$//')".in-addr.arpa
+reversed_host="$(dig PTR +short "$in_addr" | sed 's/\.$//')"
+bare_host="$(echo "$reversed_host" | sed 's/\..*//')"
+reheaded_host="$bare_host"."$domain"
+forward_host="$(dig x +short "$reheaded_host")"
+if [ "$forward_host" != "$ssh_remote" ]; then
+	echo "$0: Reverse host mismatch: $ssh_remote -> $reversed_host -> $reheaded_host -> $forward_host" >&2
+	exit 1
+fi
+
+case "$SSH_ORIGINAL_COMMAND" in
+	"btrfs receive /btrfs-snapshots/$valid_host"/*_*)
+		echo "$SSH_ORIGINAL_COMMAND" | (read junk1 junk2 DIR; mkdir -p DIR)
+		exec $SSH_ORIGINAL_COMMAND
+		;;
+	*)
+		echo "$0: Invalid command for $bare_host: $SSH_ORIGINAL_COMMAND" >&2
+		exit 1
+		;;
+esac
