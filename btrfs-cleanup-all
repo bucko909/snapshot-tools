@@ -1,9 +1,7 @@
 #!/bin/sh
 set -e
 set -x
-root="/btrfs-snapshots"
-for hostroot in "$root"/*; do
-	for snapdir in "$hostroot"/*; do
-		/root/bin/btrfs-cleanup "$snapdir"
-	done
-done
+
+. btrfs-common
+
+cleanup-all

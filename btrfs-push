@@ -1,19 +1,7 @@
 #!/bin/sh
 set -e
 set -x
-host="$(hostname)"
-root="/btrfs-snapshots/$host"
-ls "$root" | \
-	while read f; do
-		d="$(echo $f | tr _ /)"
-		snaproot="$root/$f"
-		t="$snaproot"/"$(date +%Y%m%d-%H%M%S)"
-		echo "$f" "$d" "$t"
-		btrfs subvolume snapshot -r "/$d" "$t"
-		echo "snapped"
-		if btrfs send -p "$(readlink "$snaproot"/CURRENT)" "$t" | ssh -i /root/.ssh/btrfs-send root@kiraboshi.bucko.me.uk btrfs receive "$snaproot"; then
-			rm "$snaproot"/CURRENT
-			ln -s "$t" "$snaproot"/CURRENT
-		fi
-		echo "done"
-	done
+
+. btrfs-common
+
+push-all

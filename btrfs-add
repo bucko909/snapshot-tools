@@ -1,15 +1,9 @@
 #!/bin/sh
 set -e
 set -x
-d="$(echo "$1" | sed 's|^/||')"
-h="$(hostname)"
-mv /"$d"{,-tmp}
-btrfs subvolume create /"$d"
-mv /"$d"-tmp/{,.}* /"$d" || true # We'll catch errors when we try to rename, anyway
-rmdir /"$d"-tmp
-f="$(echo "$d" | tr / _)"
-mkdir /btrfs-snapshots/"$h"/"$f"
-t=/btrfs-snapshots/"$h"/"$f"/"$(date +%Y%m%d-%H%M%S)"
-btrfs subvolume snapshot -r "/$d" "$t"
-btrfs send "$t" | ssh -i /root/.ssh/btrfs-send root@kiraboshi.bucko.me.uk btrfs receive /btrfs-snapshots/"$h"/"$f"/
-ln -s "$t" /btrfs-snapshots/"$h"/"$f"/CURRENT
+
+. btrfs-common
+
+dir-to-subvolume "$1"
+setup-dir "$1"
+send-dir-defaults "$(encode "$1")"

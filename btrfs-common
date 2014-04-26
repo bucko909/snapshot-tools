@@ -1,0 +1,139 @@
+#!/bin/sh
+
+ROOT="/btrfs-snapshots"
+
+function setup() {
+	mkdir -p "$ROOT"/"$(hostname)"
+	ln -s "$(hostname)" "$ROOT/LOCAL"
+}
+
+function dir-to-subvolume() {
+	# You can't use this on /.
+	# You don't need to, either.
+	dirname="$1"
+	mv "$dirname"{,-tmp}
+	btrfs subvolume create "$dirname"
+	mv /"$d"-tmp/{,.}* /"$d" || true # We'll catch errors when we try to remove, anyway
+	rmdir /"$d"-tmp
+}
+
+function setup-dir() {
+	dirname="$1"
+	encoded="$(encode "$dirname")"
+	mkdir "$ROOT"/LOCAL/$encoded"
+}
+
+function all-hosts() {
+	(
+		cd "$ROOT";
+		for hostroot in *; do
+			if [ -d "$hostroot" ]; then
+				echo "$hostroot"
+			fi
+		done
+	)
+}
+
+function default-push-hosts() {
+	if [ -e "$ROOT"/default-push-hosts ]; then
+		cat "$ROOT"/default-push-hosts
+	fi
+}
+
+function dirs-on-host() {
+	host="$1"
+	(
+		cd "$ROOT/$host"
+		for dir in *; do
+			echo "$dir"
+		done
+	)
+}
+		
+function cleanup-all() {
+	all-hosts | while read host; do
+		dirs-on-host "$host" | while read dir; do
+			cleanup-dir "$ROOT/$host/$dir"
+		done
+	done
+}
+
+function cleanup-dir() {
+	btrfs-cleanup-candidates $1 | while read DIRNAME; do
+		# TODO check it's not the latest for some host.
+		# We need to keep those!
+		echo "DELETING $DIRNAME"
+		btrfs subvolume delete "$DIRNAME"
+	done
+}
+
+function push-all() {
+	dirs-on-host LOCAL | while read encoded; do
+		snap "$(decode "$encoded")"
+		send-dir "$encoded"
+	done
+}
+
+function decode() {
+	echo "$1" | tr _ /
+}
+
+function encode() {
+	echo "$1" | tr / _
+}
+
+function snap() {
+	dirname="$1"
+	encoded="$(encode "$dirname")"
+	snaproot="$ROOT/LOCAL/$encoded"
+	snapname="$snaproot"/"$(date +%Y%m%d-%H%M%S)"
+	btrfs subvolume snapshot -r "$dirname" "$snapname"
+}
+
+function latest-snap() {
+	ls "$ROOT/LOCAL/$1" | grep -v '^CURRENT' | tail -n 1
+}
+
+function hosts-for-snapdir() {
+	(
+		dirname="$1"
+		cd "$dirname"
+		for I in CURRENT-*; do
+			echo "${I#*.}"
+		done
+	)
+}
+
+function send-dir() {
+	encoded="$1"
+	hosts-for-snapdir "$encoded" | while read host; do
+		send-dir-host "$encoded" "$host"
+	done
+}
+
+function send-dir-defaults() {
+	encoded="$1"
+	default-push-hosts | while read host; do
+		send-dor-host "$encoding" "$host"
+	done
+}
+
+function send-dir-host() {
+	encoded="$1"
+	host="$2"
+	snapdir="$ROOT/LOCAL/$encoded"
+	current="$(latest-snap "$encoded")"
+	last_success_file="$snapdir/CURRENT-$host"
+	if (
+		if [ -e "$last_success_file" ]; then
+			# Send a diff
+			last_success="$(readlink "$snapdir/CURRENT-$host")"
+			btrfs send -p "$snapdir/$last_success" "$snapdir/$current"
+		else
+			# Send a full snapshot
+			btrfs send "$snapdir/$current"
+		fi | SSH_AUTH_SOCK= ssh -i /root/.ssh/btrfs-send root@"$host" receive "$encoded"
+	); then
+		ln -fs "$t" "$snaproot/CURRENT-$host"
+	fi
+}
