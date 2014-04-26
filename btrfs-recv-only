@@ -12,13 +12,19 @@ if [ "$forward_host" != "$ssh_remote" ]; then
 	exit 1
 fi
 
+PATH="/root/snapshot-tools:$PATH"
+
+. btrfs-common
+
 case "$SSH_ORIGINAL_COMMAND" in
-	"btrfs receive /btrfs-snapshots/$valid_host"/*_*)
-		echo "$SSH_ORIGINAL_COMMAND" | (read junk1 junk2 DIR; mkdir -p DIR)
-		exec $SSH_ORIGINAL_COMMAND
+	"receive "*)
+		dir="${SSH_ORIGINAL_COMMAND#receive }"
+		qualified="$ROOT"/"$bare_host"/"$dir"
+		mkdir -p "$qualified"
+		exec btrfs receive "$qualified"
 		;;
 	*)
-		echo "$0: Invalid command for $bare_host: $SSH_ORIGINAL_COMMAND" >&2
+		echo "$0: Invalid command: $SSH_ORIGINAL_COMMAND" >&2
 		exit 1
 		;;
 esac

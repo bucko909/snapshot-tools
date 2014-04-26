@@ -20,14 +20,14 @@ function dir_to_subvolume() {
 function setup_dir() {
 	dirname="$1"
 	encoded="$(encode "$dirname")"
-	mkdir "$ROOT"/LOCAL/$encoded"
+	mkdir "$ROOT/LOCAL/$encoded"
 }
 
 function all_hosts() {
 	(
 		cd "$ROOT";
 		for hostroot in *; do
-			if [ -d "$hostroot" ]; then
+			if [ -d "$hostroot" ] && [ ! -L "$hostroot" ]; then
 				echo "$hostroot"
 			fi
 		done
@@ -97,9 +97,9 @@ function latest_snap() {
 function hosts_for_snapdir() {
 	(
 		dirname="$1"
-		cd "$dirname"
+		cd "$ROOT/LOCAL/$dirname"
 		for I in CURRENT-*; do
-			echo "${I#*.}"
+			echo "${I#CURRENT-}"
 		done
 	)
 }
@@ -118,6 +118,12 @@ function send_dir_defaults() {
 	done
 }
 
+function ssh_btrfs_send () {
+	host="$1"
+	encoded="$2"
+	SSH_AUTH_SOCK= ssh -i /root/.ssh/btrfs-send root@"$host" receive "$encoded"
+}
+
 function send_dir_host() {
 	encoded="$1"
 	host="$2"
@@ -128,12 +134,16 @@ function send_dir_host() {
 		if [ -e "$last_success_file" ]; then
 			# Send a diff
 			last_success="$(readlink "$snapdir/CURRENT-$host")"
-			btrfs send -p "$snapdir/$last_success" "$snapdir/$current"
+			if [ "$last_success" != "$current" ]; then
+				btrfs send -p "$snapdir/$last_success" "$snapdir/$current" | ssh_btrfs_send "$host" "$encoded"
+			else
+				false
+			fi
 		else
 			# Send a full snapshot
-			btrfs send "$snapdir/$current"
-		fi | SSH_AUTH_SOCK= ssh -i /root/.ssh/btrfs-send root@"$host" receive "$encoded"
+			btrfs send "$snapdir/$current" | ssh_btrfs_send "$host" "$encoded"
+		fi
 	); then
-		ln -fs "$t" "$snaproot/CURRENT-$host"
+		ln -nfs "$current" "$last_success_file"
 	fi
 }

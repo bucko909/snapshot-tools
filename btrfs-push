@@ -4,4 +4,4 @@ set -x
 
 . btrfs-common
 
-push-all
+push_all

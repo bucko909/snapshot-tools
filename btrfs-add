@@ -4,6 +4,6 @@ set -x
 
 . btrfs-common
 
-dir-to-subvolume "$1"
-setup-dir "$1"
-send-dir-defaults "$(encode "$1")"
+dir_to_subvolume "$1"
+setup_dir "$1"
+send_dir_defaults "$(encode "$1")"

@@ -4,4 +4,4 @@ set -x
 
 . btrfs-common
 
-cleanup-all
+cleanup_all
