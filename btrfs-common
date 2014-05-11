@@ -1,10 +1,29 @@
 #!/bin/sh
 
 ROOT="/btrfs-snapshots"
+SNAPSHOT_SEND_KEY=~/.snapshot-tools-send-key
 
 function setup() {
-	mkdir -p "$ROOT"/"$(hostname)"
-	ln -s "$(hostname)" "$ROOT/LOCAL"
+	if [ ! -d "$ROOT/$(hostname)" ]; then
+		echo "Creating local root $ROOT/$(hostname)"
+		mkdir -p "$ROOT"/"$(hostname)"
+	fi
+	if [ ! -L "$ROOT/LOCAL" ]; then
+		echo "Linking LOCAL into $ROOT"
+		ln -s "$(hostname)" "$ROOT/LOCAL"
+	fi
+	if [ ! -e "$SNAPSHOT_SEND_KEY" ]; then
+		echo "Generating our send-key"
+		ssh-keygen -t rsa -N '' -C "snapshot-tools-sender-$(hostname)" -f "$SNAPSHOT_SEND_KEY"
+	fi
+}
+
+function setup_ssh() {
+	hostname="$1"
+	set -x
+	[ -e "$SNAPSHOT_SEND_KEY".pub ] || exit 1
+	sed 's|^|command="/root/snapshot-tools/btrfs-recv-only" |' "$SNAPSHOT_SEND_KEY".pub | ssh "$hostname" "mkdir -p ~/snapshot-tools; umask 077; mkdir -p ~/.ssh; grep -q 'snapshot-tools-sender-$(hostname)$' ~/.ssh/authorized_keys 2> /dev/null || cat >> .ssh/authorized_keys"
+	scp -r /root/snapshot-tools/btrfs-* "$hostname":snapshot-tools
 }
 
 function dir_to_subvolume() {
@@ -35,8 +54,8 @@ function all_hosts() {
 }
 
 function default_push_hosts() {
-	if [ -e "$ROOT"/default_push_hosts ]; then
-		cat "$ROOT"/default_push_hosts
+	if [ -e "$ROOT"/default-push-hosts ]; then
+		cat "$ROOT"/default-push-hosts
 	fi
 }
 
@@ -82,6 +101,12 @@ function encode() {
 	echo "$1" | tr / _
 }
 
+function snap_all() {
+	dirs_on_host LOCAL | while read encoded; do
+		snap "$(decode "$encoded")"
+	done
+}
+
 function snap() {
 	dirname="$1"
 	encoded="$(encode "$dirname")"
@@ -104,6 +129,13 @@ function hosts_for_snapdir() {
 	)
 }
 
+function send_all() {
+	host="$1"
+	dirs_on_host LOCAL | while read encoded; do
+		send_dir_host "$encoded" "$host"
+	done
+}
+
 function send_dir() {
 	encoded="$1"
 	hosts_for_snapdir "$encoded" | while read host; do
@@ -114,14 +146,24 @@ function send_dir() {
 function send_dir_defaults() {
 	encoded="$1"
 	default_push_hosts | while read host; do
-		send_dir_host "$encoding" "$host"
+		send_dir_host "$encoded" "$host"
+	done
+}
+
+function add_default_push_host() {
+	host="$1"
+	grep -v "^$host$" "$ROOT"/default-send-hosts > "$ROOT/default-send-hosts.1"
+	echo "$host" >> "$ROOT/default-send-hosts.1"
+	mv "$ROOT/default-send-hosts"{.1,}
+	dirs_on_host LOCAL | while read encoded; do
+		send_dir_host "$encoded" "$host"
 	done
 }
 
 function ssh_btrfs_send () {
 	host="$1"
 	encoded="$2"
-	SSH_AUTH_SOCK= ssh -i /root/.ssh/btrfs-send root@"$host" receive "$encoded"
+	SSH_AUTH_SOCK= ssh -o 'Compression yes' -i "$SNAPSHOT_SEND_KEY" root@"$host" receive "$encoded"
 }
 
 function send_dir_host() {

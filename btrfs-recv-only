@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 domain="$(grep search /etc/resolv.conf | cut -d' ' -f2)"
 ssh_remote="$(echo "$SSH_CLIENT" | cut -d' ' -f1)"

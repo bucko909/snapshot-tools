@@ -13,16 +13,27 @@ NAME_RE = re.compile(r'\d{8}-\d{6}')
 def candidates_in_dir(dirname):
 	now = datetime.datetime.now()
 	aged_list = []
+	required = set()
 	for name in os.listdir(dirname):
 		fullname = os.path.join(dirname, name)
 		if os.path.isdir(fullname) and NAME_RE.match(name):
 			snapts = datetime.datetime.strptime(name, '%Y%m%d-%H%M%S')
 			age = (now - snapts).total_seconds()
 			aged_list.append((age, fullname))
+		elif name.startswith('CURRENT-'):
+			required.add(os.path.join(dirname, os.readlink(fullname)))
 		else: #elif name not in ('CURRENT',):
 			print >>sys.stderr, "Rejecting name", name
 	aged_list.sort()
-	return candidates_in_list(aged_list)
+	accept, reject = candidates_in_list(aged_list)
+	real_reject = []
+	for candidate in reject:
+		if candidate in required:
+			print >>sys.stderr, "Accepting (required) name", candidate
+			accept.append(candidate)
+		else:
+			real_reject.append(candidate)
+	return accept, real_reject
 
 def candidates_in_list(aged_list):
 	accept = []
