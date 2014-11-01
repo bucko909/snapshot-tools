@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ROOT="/btrfs-snapshots"
 SNAPSHOT_SEND_KEY=~/.snapshot-tools-send-key
