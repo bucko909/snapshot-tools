@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+set -x
+
+. btrfs-common
+
+send_all "$1"
