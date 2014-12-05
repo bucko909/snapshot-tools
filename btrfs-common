@@ -32,8 +32,8 @@ function dir_to_subvolume() {
 	dirname="$1"
 	mv "$dirname"{,-tmp}
 	btrfs subvolume create "$dirname"
-	mv /"$d"-tmp/{,.}* /"$d" || true # We'll catch errors when we try to remove, anyway
-	rmdir /"$d"-tmp
+	mv /"$dirname"-tmp/{,.}* /"$d" || true # We'll catch errors when we try to remove, anyway
+	rmdir /"$dirname"-tmp
 }
 
 function setup_dir() {
